@@ -20,12 +20,16 @@ type winsize struct {
   ws_ypixel uint16
 }
 
-func setwindowrect(ws *winsize, fd uintptr) error {
+func Resize(pty *os.File, rows uint16, cols uint16) error {
+  ws := winsize {
+    ws_row: rows,
+    ws_col: cols,
+  }
   _, _, errno := syscall.Syscall(
     syscall.SYS_IOCTL,
-    fd,
+    pty.Fd(),
     syscall.TIOCSWINSZ,
-    uintptr(unsafe.Pointer(ws)),
+    uintptr(unsafe.Pointer(&ws)),
   )
   if errno != 0 {
     return syscall.Errno(errno)
@@ -72,10 +76,7 @@ func main() {
     }()
 
     so.On("resize", func(data map[string]uint16) {
-      ws := new(winsize)
-      ws.ws_row = data["row"]
-      ws.ws_col = data["col"]
-      setwindowrect(ws, f.Fd())
+      Resize(f, data["row"], data["col"])
     })
 
     so.On("input", func(data string) {
@@ -85,7 +86,6 @@ func main() {
     so.On("disconnection", func() {
       c.Process.Kill()
     })
-
   })
 
   server.On("error", func(so socketio.Socket, err error) {
@@ -93,7 +93,6 @@ func main() {
   })
 
   http.Handle("/wetty/socket.io/", server)
-  // http.Handle("/", http.FileServer(http.Dir("webroot")))
   http.Handle("/", http.FileServer(rice.MustFindBox("webroot").HTTPBox()))
 
   log.Print("Listening on :3000")
