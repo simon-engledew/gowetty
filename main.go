@@ -4,9 +4,10 @@ import (
   "github.com/googollee/go-socket.io"
   "github.com/kr/pty"
   "github.com/GeertJohan/go.rice"
+  "gopkg.in/alecthomas/kingpin.v2"
   "log"
+  "fmt"
   "net/http"
-  "path"
   "os"
   "os/exec"
   "syscall"
@@ -37,12 +38,16 @@ func Resize(pty *os.File, rows uint16, cols uint16) error {
   return nil
 }
 
+var (
+  port = kingpin.Flag("port", "Port to run web server on.").Short('p').Default("3000").Int()
+  command = kingpin.Arg("command", "Command to run").Required().String()
+  args = kingpin.Arg("args", "Args to pass to command").Strings()
+)
+
 func main() {
   log.SetFlags(log.Lshortfile)
 
-  if len(os.Args) < 2 {
-    log.Fatal("usage: ", path.Base(os.Args[0]), " <command> [<args> ...]")
-  }
+  kingpin.Parse()
 
   server, err := socketio.NewServer(nil)
   if err != nil {
@@ -52,7 +57,7 @@ func main() {
   server.On("connection", func(so socketio.Socket) {
     log.Print("CLIENT CONNECTED")
 
-    c := exec.Command(os.Args[1], os.Args[2:]...)
+    c := exec.Command(*command, *args...)
     f, err := pty.Start(c)
     if err != nil {
       panic(err)
@@ -95,6 +100,6 @@ func main() {
   http.Handle("/wetty/socket.io/", server)
   http.Handle("/", http.FileServer(rice.MustFindBox("webroot").HTTPBox()))
 
-  log.Print("Listening on :3000")
-  log.Fatal(http.ListenAndServe(":3000", nil))
+  log.Print(fmt.Sprintf("Listening on :%d", *port))
+  log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
 }
