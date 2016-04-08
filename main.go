@@ -40,6 +40,7 @@ func Resize(pty *os.File, rows uint16, cols uint16) error {
 
 var (
   port = kingpin.Flag("port", "Port to run web server on.").Short('p').Default("3000").Int()
+  readonly = kingpin.Flag("readonly", "Do not connect STDIN.").Bool()
   command = kingpin.Arg("command", "Command to run").Required().String()
   args = kingpin.Arg("args", "Args to pass to command").Strings()
 )
@@ -85,7 +86,9 @@ func main() {
     })
 
     so.On("input", func(data string) {
-      f.Write([]byte(data))
+      if (!*readonly) {
+        f.Write([]byte(data))
+      }
     })
 
     so.On("disconnection", func() {
